@@ -1,130 +1,122 @@
 <div align="center">
-  <img src="docs/assets/rolling-robot-hero.svg" alt="Rolling Robot project banner" width="100%" />
 
-  <br />
+<img src="docs/assets/rolling-robot-hero.svg" alt="Rolling Robot" width="100%" />
 
-  <a href="README.md"><strong>English</strong></a> ·
-  <a href="README.zh-CN.md">简体中文</a>
+# Rolling Robot
 
-  <br /><br />
+**An untethered dodecahedral soft robot that rolls by reshaping itself.**
 
-  <img alt="Platform" src="https://img.shields.io/badge/platform-STM32-03234B?style=flat-square&logo=stmicroelectronics&logoColor=white" />
-  <img alt="RTOS" src="https://img.shields.io/badge/RTOS-FreeRTOS-18A999?style=flat-square" />
-  <img alt="Firmware" src="https://img.shields.io/badge/firmware-C-5C6BC0?style=flat-square&logo=c&logoColor=white" />
-  <img alt="CAD" src="https://img.shields.io/badge/CAD-SolidWorks-E2231A?style=flat-square" />
-  <img alt="Project status" src="https://img.shields.io/badge/status-research_prototype-F59E0B?style=flat-square" />
+[English](README.md) · [简体中文](README.zh-CN.md)
+
+![STM32](https://img.shields.io/badge/STM32-F407%20%7C%20F103-03234B?style=flat-square&logo=stmicroelectronics&logoColor=white)
+![FreeRTOS](https://img.shields.io/badge/FreeRTOS-18A999?style=flat-square)
+![C](https://img.shields.io/badge/C-5C6BC0?style=flat-square&logo=c&logoColor=white)
+![SolidWorks](https://img.shields.io/badge/SolidWorks-E2231A?style=flat-square)
+![Status](https://img.shields.io/badge/status-research_prototype-F59E0B?style=flat-square)
+
 </div>
 
-## An untethered robot that rolls by changing its own shape
+---
 
-Rolling Robot is a B.Eng. capstone project by **Yufeng Zeng (曾宇烽)** at South China University of Technology. Twelve pneumatic–tendon soft legs are arranged on the faces of a regular dodecahedral body. Coordinated contraction and extension shift the robot's center of mass beyond its support polygon, producing omnidirectional rolling without an external air line.
+Twelve pneumatic–tendon soft legs sit on the faces of a regular dodecahedron. By contracting and extending them in sequence, the robot pushes its center of mass past the support polygon and rolls in any direction — with no external air line.
 
-> This repository contains the embedded firmware, Keil projects, prebuilt binaries, and mechanical source files used for the prototype.
+B.Eng. capstone project · School of Robotics, South China University of Technology · Advisor: Prof. Yunquan Li
 
-## What makes it different
+## Highlights
 
-| | Design choice | Purpose |
-|---|---|---|
-| **01** | Dodecahedral body with 12 actuated faces | Similar rolling behavior in multiple directions |
-| **02** | Pneumatic–tendon coupled soft leg | Tendons provide contraction while air pressure tunes stiffness and extension force |
-| **03** | Interconnected three-leg pneumatic circuit | Reuses displaced air during a “two contract, one extends” step |
-| **04** | Distributed STM32 control | Separates handheld input from real-time sensing and actuation on the robot |
-| **05** | IMU-based state estimation | Identifies the supporting vertices and selects the next motion direction |
+- **Omnidirectional rolling** — 12 actuated faces on a symmetric dodecahedral body
+- **Pneumatic–tendon coupled legs** — tendons contract, air pressure tunes stiffness and extension force
+- **Interconnected air circuit** — air displaced by two contracting legs is reused by the extending one
+- **Distributed control** — handheld STM32F103 controller + on-board STM32F407 running FreeRTOS
+- **IMU state estimation** — detects the supporting vertices and picks the next rolling direction
+
+## Results
+
+| Metric | Value |
+| --- | --- |
+| Peak-window speed (flat ground, 15 kPa) | **0.267 m/s** |
+| Full-run average speed (15 kPa) | 0.053 m/s |
+| Payload | Rolls continuously with **1 kg** (−43% speed) |
+| Terrain | Flat ground, gravel, grass |
+| Coupled vs. uncoupled actuation | ~34% lower tendon tension, ~3× extension force |
+
+<sub>Measured on the original prototype; not a performance guarantee for reproductions.</sub>
 
 ## System architecture
 
 ```mermaid
 flowchart LR
-    C[Handheld controller<br/>STM32F103] -->|NRF24L01<br/>2.4 GHz| R[Robot controller<br/>STM32F407 + FreeRTOS]
+    C[Handheld controller<br/>STM32F103] -->|NRF24L01 · 2.4 GHz| R[Robot controller<br/>STM32F407 + FreeRTOS]
     I[9-axis IMU] --> R
     P[Pressure sensor] --> R
     R --> S[12 tendon servos]
     R --> A[Pump + valves]
-    S --> L[Pneumatic–tendon<br/>soft legs]
+    S --> L[Soft legs]
     A --> L
-    L --> M[Dodecahedral body<br/>omnidirectional rolling]
+    L --> M[Omnidirectional rolling]
 ```
 
-The robot-side firmware runs five application tasks connected through FreeRTOS queues:
+On the robot, five FreeRTOS tasks communicate through queues:
 
-- `wit_imu` — attitude, supporting-vertex, direction, and velocity estimation
-- `nrf_recv` — command reception and set-point updates
-- `charge_task` — pressure control with PID-assisted soft PWM
-- `move_task` — gait selection and interpolated servo motion
-- `nrf_send` — telemetry back to the handheld controller
+| Task | Source | Role |
+| --- | --- | --- |
+| `wit_imu` | [`wit_imu.c`](firmware/robot/Task/Src/wit_imu.c) | Attitude, supporting vertices, direction and speed |
+| `nrf_recv` | [`nrf_recv.c`](firmware/robot/Task/Src/nrf_recv.c) | Receives commands, updates set points |
+| `charge_task` | [`pump_charge.c`](firmware/robot/Task/Src/pump_charge.c) | Pressure control with PID-assisted soft PWM |
+| `move_task` | [`servo_move.c`](firmware/robot/Task/Src/servo_move.c) | Gait selection and interpolated servo motion |
+| `nrf_send` | [`nrf_send.c`](firmware/robot/Task/Src/nrf_send.c) | Telemetry back to the controller |
+
+## Repository layout
+
+```text
+Rolling_Robot/
+├── firmware/
+│   ├── robot/        # STM32F407VET6 · Keil project, FreeRTOS tasks, drivers
+│   ├── controller/   # STM32F103C8T6 · handheld remote with OLED
+│   └── prebuilt/     # Ready-to-flash .hex images
+├── hardware/
+│   └── cad/          # SolidWorks parts & assemblies, STL / 3MF exports
+└── docs/assets/      # README artwork
+```
+
+## Getting started
+
+**Flash prebuilt firmware** — use STM32CubeProgrammer (or any ST-Link tool):
+
+| File | Target |
+| --- | --- |
+| [`firmware/prebuilt/rolling-robot.hex`](firmware/prebuilt/rolling-robot.hex) | STM32F407VET6 robot controller |
+| [`firmware/prebuilt/controller.hex`](firmware/prebuilt/controller.hex) | STM32F103C8T6 handheld controller |
+
+**Build from source** — install Keil MDK-ARM with the STM32F1/F4 device packs, then open:
+
+- Robot: [`firmware/robot/MDK-ARM/RollingRobot.uvprojx`](firmware/robot/MDK-ARM/RollingRobot.uvprojx)
+- Controller: [`firmware/controller/MDK-ARM/Controller.uvprojx`](firmware/controller/MDK-ARM/Controller.uvprojx)
+
+Pin assignments live in each project's `.ioc` file. Generated HAL/CMSIS sources are committed so the projects open without regenerating them in STM32CubeMX.
+
+More details: [firmware notes](firmware/README.md) · [mechanical notes](hardware/README.md)
 
 ## Prototype specifications
 
 | Parameter | Value |
-|---|---|
-| Body geometry | Regular dodecahedron |
-| Circumscribed radius | 150 mm |
-| Soft legs | 12 |
-| Nominal leg travel | 75 mm |
-| Actuation | Tendon-driven contraction + pneumatic extension/stiffness control |
-| Robot MCU | STM32F407VET6, Cortex-M4, 168 MHz |
-| Controller MCU | STM32F103C8T6, Cortex-M3 |
-| Wireless link | NRF24L01, 2.4 GHz |
-| State sensing | WIT 9-axis IMU |
-| Control software | STM32 HAL + FreeRTOS |
+| --- | --- |
+| Body | Regular dodecahedron, 150 mm circumscribed radius |
+| Legs | 12 × pneumatic–tendon soft legs, 75 mm nominal travel |
+| Robot MCU | STM32F407VET6 (Cortex-M4, 168 MHz) |
+| Controller MCU | STM32F103C8T6 (Cortex-M3) |
+| Wireless | NRF24L01, 2.4 GHz |
+| Sensing | WIT 9-axis IMU, pressure sensor |
+| Software | STM32 HAL + FreeRTOS |
 
-## Experimental results
+## Scope
 
-- Peak-window speed on flat ground: **0.267 m/s at 15 kPa**
-- Full-run average speed at the same pressure: **0.053 m/s**
-- Continuous rolling with a **1 kg payload**, with a measured 43% speed reduction
-- Demonstrated locomotion on flat ground, gravel, and grass
-- Interconnected pneumatic actuation reduced tendon tension by approximately **34%** and increased extension output force to nearly **3×** the uncoupled case
+This is an archived research prototype, not a plug-and-play kit. Reproducing it requires matching electronics, pneumatic parts, servo calibration and assembly. A full BOM and wiring diagram are not yet included.
 
-These values describe the tested prototype and its experimental setup; they are not general performance guarantees.
+## Acknowledgment
 
-## Repository map
-
-| Path | Contents |
-|---|---|
-| [`Code/`](Code/) | STM32CubeMX/Keil firmware for the robot and handheld controller |
-| [`Code/RollingRobot/RollingRobot/Task/`](Code/RollingRobot/RollingRobot/Task/) | Robot application tasks and control logic |
-| [`Mechanical_Design/`](Mechanical_Design/) | SolidWorks assemblies, printable STL files, and 3MF files |
-| [`firmware/`](firmware/) | Prebuilt HEX images for both STM32 targets |
-| [`docs/assets/`](docs/assets/) | Repository artwork and documentation assets |
-
-The generated STM32 HAL/CMSIS sources remain in the repository so the projects can be opened without recreating them in STM32CubeMX. Keil object files, build reports, and machine-specific settings are intentionally excluded.
-
-## Build and flash
-
-### Option A — use the prebuilt firmware
-
-Flash the matching image from [`firmware/`](firmware/) with STM32CubeProgrammer or another ST-Link-compatible tool:
-
-- `rolling-robot.hex` — STM32F407VET6 robot controller
-- `controller.hex` — STM32F103C8T6 handheld controller
-
-### Option B — build from source
-
-1. Install Keil MDK-ARM with the STM32F1 and STM32F4 device packs.
-2. Open the relevant project:
-   - Robot: [`Code/RollingRobot/RollingRobot/MDK-ARM/RollingRobot.uvprojx`](Code/RollingRobot/RollingRobot/MDK-ARM/RollingRobot.uvprojx)
-   - Controller: [`Code/RollingRobot/Controller/Controller/MDK-ARM/Controller.uvprojx`](Code/RollingRobot/Controller/Controller/MDK-ARM/Controller.uvprojx)
-3. Build the target and flash it through ST-Link.
-
-Hardware pin assignments and peripheral initialization are defined in the corresponding `.ioc` files and generated `Core/` sources.
-
-## Mechanical files
-
-The [`Mechanical_Design/Model/`](Mechanical_Design/Model/) directory includes editable SolidWorks parts/assemblies and printable exports. Original filenames are retained because changing them can break assembly references. See the [mechanical design notes](Mechanical_Design/README.md) before reorganizing those files locally.
-
-## Project scope
-
-This is an archived research prototype rather than a plug-and-play kit. Reproduction requires the original electronics, pneumatic components, servo calibration, and mechanical assembly. The repository does not currently include a complete bill of materials or wiring diagram.
-
-## Author and acknowledgment
-
-Developed by **Yufeng Zeng (曾宇烽)** as an undergraduate capstone project at the School of Robotics, South China University of Technology.
-
-Advisor: **Prof. Yunquan Li (李云泉)**
-
-The pneumatic–tendon coupling concept builds on prior work by Fu et al. on untethered soft rolling robots (IEEE Robotics and Automation Letters, 2024).
+The pneumatic–tendon coupling concept builds on prior work by Fu et al. on untethered soft rolling robots (*IEEE Robotics and Automation Letters*, 2024).
 
 ## License
 
-No open-source license has been added yet. Unless a license is added, copyright remains with the author and reuse requires permission.
+No open-source license yet — copyright remains with the author (Yufeng Zeng) and reuse requires permission.

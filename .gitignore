@@ -33,7 +33,7 @@ Listings/
 *.Bak
 
 # Keep the curated, prebuilt firmware images
-!firmware/*.hex
+!firmware/prebuilt/*.hex
 
 # STM32CubeMX local backups
 *.ioc.bak
